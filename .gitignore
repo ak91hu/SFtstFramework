@@ -1,0 +1,15 @@
+target/
+.claude/
+allure-results/
+session.json
+src/test/resources/config.properties
+screenshots/
+*.class
+node_modules/
+package-lock.json
+selectors.json
+explore.js
+explore2.js
+explore_detail.js
+login_save_session.js
+debug_save.js

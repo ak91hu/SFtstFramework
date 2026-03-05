@@ -1,0 +1,50 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Salesforce Test Suite" verbose="1">
+
+    <listeners>
+        <listener class-name="com.salesforce.tests.ScreenshotListener"/>
+    </listeners>
+
+    <test name="Opportunity E2E">
+        <classes>
+            <class name="com.salesforce.tests.OpportunityE2ETest"/>
+        </classes>
+    </test>
+
+    <test name="Login Tests">
+        <classes>
+            <class name="com.salesforce.tests.LoginTest"/>
+        </classes>
+    </test>
+
+    <test name="Navigation Tests">
+        <classes>
+            <class name="com.salesforce.tests.NavigationTest"/>
+        </classes>
+    </test>
+
+    <test name="Account Tests">
+        <classes>
+            <class name="com.salesforce.tests.AccountTest"/>
+        </classes>
+    </test>
+
+    <test name="Contact Tests">
+        <classes>
+            <class name="com.salesforce.tests.ContactTest"/>
+        </classes>
+    </test>
+
+    <test name="Lead Tests">
+        <classes>
+            <class name="com.salesforce.tests.LeadTest"/>
+        </classes>
+    </test>
+
+    <test name="Opportunity Tests">
+        <classes>
+            <class name="com.salesforce.tests.OpportunityTest"/>
+        </classes>
+    </test>
+
+</suite>

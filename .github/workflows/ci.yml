@@ -1,0 +1,127 @@
+name: Salesforce E2E Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# Pages write permission required for the deploy-report job.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  JAVA_VERSION: '11'
+
+jobs:
+  test:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Write config.properties
+        env:
+          SF_BASE_URL: ${{ secrets.SF_BASE_URL }}
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+          SF_PASSWORD: ${{ secrets.SF_PASSWORD }}
+        run: |
+          cat > src/test/resources/config.properties << EOF
+          sf.base.url=${SF_BASE_URL}
+          sf.username=${SF_USERNAME}
+          sf.password=${SF_PASSWORD}
+          sf.session.file=session.json
+          browser.headless=true
+          browser.slowmo=0
+          browser.timeout=30000
+          EOF
+
+      - name: Install Playwright browsers
+        run: mvn exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps chromium" --no-transfer-progress
+
+      - name: Run tests and generate Allure report
+        # testFailureIgnore=true in pom.xml ensures verify phase always runs so
+        # the Allure report is generated even when tests fail.
+        run: mvn verify --no-transfer-progress
+
+      - name: Fail pipeline if tests failed
+        # Explicit gate: parse Surefire results and exit 1 if any test failed.
+        # This restores correct CI pass/fail after testFailureIgnore=true.
+        if: always()
+        run: |
+          result=$(node agents/parse-results.js)
+          echo "$result"
+          echo "$result" | grep -q '"runStatus": "GREEN"' || \
+            { echo "One or more tests failed. Check the Allure report."; exit 1; }
+
+      - name: Upload Allure report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-${{ github.run_number }}
+          path: target/site/allure-maven-plugin/
+          retention-days: 30
+
+      - name: Upload Allure raw results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ github.run_number }}
+          path: allure-results/
+          retention-days: 7
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_number }}
+          path: screenshots/
+          retention-days: 7
+
+      - name: Upload Surefire XML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ github.run_number }}
+          path: target/surefire-reports/
+          retention-days: 7
+
+      # Prepare the Allure report for GitHub Pages deployment.
+      # The upload-pages-artifact action packages the directory into a
+      # special "github-pages" artifact consumed by deploy-pages below.
+      - name: Prepare Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/site/allure-maven-plugin/
+
+  # ── Allure report → GitHub Pages ──────────────────────────────────────────
+  # Runs after every push/dispatch to main/master (not on PRs — forks lack
+  # the write permissions needed to deploy to Pages).
+  deploy-report:
+    name: Publish Allure Report → GitHub Pages
+    needs: test
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Allure report to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

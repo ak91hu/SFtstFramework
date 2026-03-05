@@ -1,0 +1,8 @@
+# Normalize line endings to LF in the repository, check out as-is on Windows
+* text=auto
+*.java text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+*.json text eol=lf
+*.js text eol=lf
+*.md text eol=lf
