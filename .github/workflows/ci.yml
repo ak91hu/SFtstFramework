@@ -55,6 +55,8 @@ jobs:
       - name: Run tests and generate Allure report
         # testFailureIgnore=true in pom.xml ensures verify phase always runs so
         # the Allure report is generated even when tests fail.
+        env:
+          TESTMAIL_API_KEY: ${{ secrets.TESTMAIL_API_KEY }}
         run: mvn verify --no-transfer-progress
 
       - name: Fail pipeline if tests failed
