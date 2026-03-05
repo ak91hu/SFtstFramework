@@ -2,6 +2,7 @@ package com.salesforce.tests;
 
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import com.salesforce.framework.config.ConfigManager;
 import org.testng.annotations.*;
 
@@ -134,7 +135,7 @@ public class BaseTest {
                 Locator sendBtn = page.locator("input#save, input#verify, input[name='save'], input[type='submit'], " +
                                               "button:has-text('Send'), input[value*='Email']").first();
                 try {
-                    sendBtn.waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.ElementState.VISIBLE).setTimeout(10000));
+                    sendBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
                     log("Send button found: " + sendBtn.getAttribute("value"));
                     sendBtn.click();
                     log("Clicked Send button. Waiting for Finish page...");
