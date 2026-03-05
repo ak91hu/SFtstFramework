@@ -129,16 +129,27 @@ public class BaseTest {
             if (page.url().contains("EmailVerificationStartUi")) {
                 log("On verification START page. Looking for Send button...");
                 saveDebugScreenshot("verification_start");
-                Locator sendBtn = page.locator("input#save, input#verify, input[type='submit'], button:has-text('Send')");
-                if (sendBtn.count() > 0) {
-                    sendBtn.first().click();
+                
+                // Broad selector: Salesforce often uses input[name='save'] or value containing "Email"
+                Locator sendBtn = page.locator("input#save, input#verify, input[name='save'], input[type='submit'], " +
+                                              "button:has-text('Send'), input[value*='Email']").first();
+                try {
+                    sendBtn.waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.ElementState.VISIBLE).setTimeout(10000));
+                    log("Send button found: " + sendBtn.getAttribute("value"));
+                    sendBtn.click();
                     log("Clicked Send button. Waiting for Finish page...");
                     try {
                         page.waitForURL(url -> url.contains("EmailVerificationFinishUi"), 
-                            new Page.WaitForURLOptions().setTimeout(20000));
+                            new Page.WaitForURLOptions().setTimeout(25000));
                         page.waitForLoadState(LoadState.DOMCONTENTLOADED);
                     } catch (Exception e) {
                         log("URL did not change to FinishUi after clicking Send. Current: " + page.url());
+                    }
+                } catch (Exception e) {
+                    log("Send button not visible after 10s. Listing all visible buttons...");
+                    Locator allButtons = page.locator("input[type='submit'], button:visible");
+                    for (int i = 0; i < allButtons.count(); i++) {
+                        log("  Button " + i + ": " + allButtons.nth(i).getAttribute("value") + " | " + allButtons.nth(i).innerText());
                     }
                 }
             }

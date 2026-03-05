@@ -51,7 +51,7 @@ jobs:
 
       - name: Install Playwright browsers & dependencies
         run: |
-          sudo npx playwright install-deps chromium
+          mvn exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install-deps chromium" --no-transfer-progress
           mvn exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium" --no-transfer-progress
 
       - name: Run tests and generate Allure report
