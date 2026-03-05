@@ -66,29 +66,45 @@ public abstract class BasePage {
     // Waits for the title to reflect the record rather than a loading/transition state.
     public String getRecordHeading() {
         waitForSpinner();
-        // Wait until the tab title is no longer a generic loading/nav title
+        
+        // 1. Prefer specific Salesforce Lightning record name fields
+        Locator recordName = page.locator("slot[name='primaryField'] .slds-page-header__title, " +
+                                          "lightning-formatted-text.slds-page-header__title, " +
+                                          ".records-record-layout-item[field-label='Name'] .slds-form-element__static");
+        try {
+            recordName.first().waitFor(new Locator.WaitForOptions().setTimeout(10000));
+            String val = recordName.first().innerText().trim();
+            if (!val.isEmpty() && !val.equalsIgnoreCase("Lightning Experience")) return val;
+        } catch (Exception ignored) {}
+
+        // 2. Wait for the tab title to reflect the record
         try {
             page.waitForFunction(
                 "() => { const t = document.title; return t.includes(' | ') && " +
                 "!t.startsWith('Lightning') && !t.startsWith('New ') && " +
-                "!t.startsWith('Home') && !t.startsWith('Developer'); }",
-                null, new Page.WaitForFunctionOptions().setTimeout(15000));
+                "!t.startsWith('Home') && !t.startsWith('Developer') && " +
+                "!t.startsWith('Loading'); }",
+                null, new Page.WaitForFunctionOptions().setTimeout(10000));
         } catch (Exception ignored) {}
+        
         String title = page.title();
         int barIdx = title.indexOf(" | ");
         if (barIdx > 0) {
-            return title.substring(0, barIdx).trim();
+            String candidate = title.substring(0, barIdx).trim();
+            if (!candidate.equalsIgnoreCase("Lightning Experience")) return candidate;
         }
-        // Fallback: first visible h1 on the page
+
+        // 3. Last fallback: first visible h1 on the page (excluding generic ones)
         Locator allH1 = page.locator("h1");
         int count = allH1.count();
         for (int i = 0; i < count; i++) {
             Locator h = allH1.nth(i);
             if (h.isVisible()) {
-                return h.innerText().trim();
+                String val = h.innerText().trim();
+                if (!val.isEmpty() && !val.equalsIgnoreCase("Lightning Experience")) return val;
             }
         }
-        allH1.first().waitFor();
-        return allH1.first().innerText().trim();
+        
+        return page.title();
     }
 }
