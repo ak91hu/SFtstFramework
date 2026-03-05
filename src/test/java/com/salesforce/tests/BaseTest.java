@@ -133,10 +133,19 @@ public class BaseTest {
                 Locator remember = page.locator("input#RememberDeviceCheckbox");
                 if (remember.count() > 0) remember.check();
                 saveDebugScreenshot("before_otp_submit");
-                page.locator("input#save, input[type='submit']").first().click();
+                
+                String postOtpUrl = page.url();
+                page.locator("input#save, input#verify, input[type='submit']").first().click();
+                
+                log("Waiting for post-OTP redirect...");
                 try {
-                    page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(30000));
-                } catch (Exception ignored) {}
+                    page.waitForURL(url -> !url.equals(postOtpUrl), 
+                        new Page.WaitForURLOptions().setTimeout(30000));
+                    page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(20000));
+                } catch (Exception e) {
+                    log("URL did not change after OTP submission. Current: " + page.url());
+                }
+                saveDebugScreenshot("after_otp_submit");
             }
         }
 

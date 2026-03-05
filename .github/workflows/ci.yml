@@ -50,7 +50,9 @@ jobs:
           EOF
 
       - name: Install Playwright browsers & dependencies
-        run: sudo mvn exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps chromium" --no-transfer-progress
+        run: |
+          npx playwright install-deps chromium
+          mvn exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium" --no-transfer-progress
 
       - name: Run tests and generate Allure report
         # testFailureIgnore=true in pom.xml ensures verify phase always runs so
