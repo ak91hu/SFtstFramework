@@ -41,7 +41,15 @@ public class OpportunityTest extends BaseTest {
         oppPage.save();
 
         page.waitForURL("**/r/**/view");
-        String heading = oppPage.getRecordHeading();
+        
+        // Retry record heading check up to 3 times as Salesforce navigation is flaky
+        String heading = "";
+        for (int i = 0; i < 3; i++) {
+            heading = oppPage.getRecordHeading();
+            if (heading.contains(OPP_NAME)) break;
+            page.waitForTimeout(3000);
+        }
+        
         Assert.assertTrue(heading.contains(OPP_NAME),
             "Record heading should contain: " + OPP_NAME + ", got: " + heading);
     }

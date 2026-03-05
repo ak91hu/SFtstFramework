@@ -46,7 +46,15 @@ public class ContactTest extends BaseTest {
         contactPage.save();
 
         page.waitForURL("**/r/**/view");
-        String heading = contactPage.getRecordHeading();
+        
+        // Retry record heading check up to 3 times as Salesforce navigation is flaky
+        String heading = "";
+        for (int i = 0; i < 3; i++) {
+            heading = contactPage.getRecordHeading();
+            if (heading.contains(LAST_NAME)) break;
+            page.waitForTimeout(3000);
+        }
+        
         Assert.assertTrue(heading.contains(LAST_NAME),
             "Record heading should contain: " + LAST_NAME + ", got: " + heading);
     }

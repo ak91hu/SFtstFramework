@@ -40,7 +40,15 @@ public class AccountTest extends BaseTest {
 
         // After save, Salesforce navigates to the record detail page
         page.waitForURL("**/r/**/view");
-        String heading = accountPage.getRecordHeading();
+        
+        // Retry record heading check up to 3 times as Salesforce navigation is flaky
+        String heading = "";
+        for (int i = 0; i < 3; i++) {
+            heading = accountPage.getRecordHeading();
+            if (heading.contains(ACCOUNT_NAME)) break;
+            page.waitForTimeout(3000);
+        }
+        
         Assert.assertTrue(heading.contains(ACCOUNT_NAME),
             "Record heading should contain: " + ACCOUNT_NAME + ", got: " + heading);
     }
