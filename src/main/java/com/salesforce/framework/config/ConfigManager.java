@@ -28,7 +28,8 @@ public class ConfigManager {
     }
 
     public static String get(String key) {
-        String envKey = "SF_" + key.toUpperCase().replace('.', '_');
+        String base = key.toUpperCase().replace('.', '_');
+        String envKey = base.startsWith("SF_") ? base : "SF_" + base;
         String envVal = System.getenv(envKey);
         if (envVal != null && !envVal.isEmpty()) return envVal;
         return props.getProperty(key, "");
