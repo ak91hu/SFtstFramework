@@ -43,6 +43,12 @@ public class BaseTest {
         }
         context.setDefaultTimeout(ConfigManager.getDefaultTimeout());
         page = context.newPage();
+        
+        // Capture browser console logs
+        page.onConsoleMessage(msg -> {
+            System.out.println("[BROWSER] [" + msg.type() + "] " + msg.text());
+        });
+
         ensureLoggedIn();
     }
 
@@ -63,48 +69,70 @@ public class BaseTest {
         if (targetUrl.endsWith("/")) targetUrl = targetUrl.substring(0, targetUrl.length() - 1);
         targetUrl += "/lightning/page/home";
 
-        System.out.println("[BaseTest] Navigating to: " + targetUrl);
-        page.navigate(targetUrl, new Page.NavigateOptions().setTimeout(90000));
+        log("Navigating to: " + targetUrl);
+        try {
+            page.navigate(targetUrl, new Page.NavigateOptions().setTimeout(90000));
+        } catch (Exception e) {
+            log("Navigation failed: " + e.getMessage());
+            saveDebugScreenshot("nav_failure");
+            throw e;
+        }
         
         try {
             page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(15000));
         } catch (Exception ignored) {}
 
-        System.out.println("[BaseTest] Current URL: " + page.url());
+        log("Current URL: " + page.url());
+        saveDebugScreenshot("initial_load");
 
         // If we ended up on the login page, the session is missing or expired.
         if (page.url().contains("/login") || page.locator("#username").isVisible()) {
-            System.out.println("[BaseTest] Session expired or not found. Logging in...");
+            log("Session expired or not found. Logging in...");
             doLogin();
         } else {
-            System.out.println("[BaseTest] Already logged in or on an intermediate page.");
+            log("Already logged in or on an intermediate page.");
             handleIntermediatePages();
         }
     }
 
     private void doLogin() {
         long loginTimestamp = System.currentTimeMillis();
-        System.out.println("[BaseTest] Filling credentials for: " + ConfigManager.getUsername());
+        log("Filling credentials for: " + ConfigManager.getUsername());
         
         page.fill("#username", ConfigManager.getUsername());
         page.fill("#password", ConfigManager.getPassword());
+        saveDebugScreenshot("before_login_click");
+        
+        // Wait for the URL to change after clicking Login.
+        String currentUrl = page.url();
         page.click("#Login");
+        
+        log("Waiting for post-login redirect...");
+        try {
+            page.waitForURL(url -> !url.equals(currentUrl), 
+                new Page.WaitForURLOptions().setTimeout(30000));
+        } catch (Exception e) {
+            log("URL did not change after 30s. Current URL: " + page.url());
+            saveDebugScreenshot("login_no_redirect");
+        }
         
         try {
             page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(30000));
         } catch (Exception ignored) {}
         
-        System.out.println("[BaseTest] Post-login URL: " + page.url());
+        log("Post-login URL: " + page.url());
+        saveDebugScreenshot("post_login_click");
 
         // Handle email OTP verification (Salesforce sends a code when device is unrecognised).
         if (page.url().contains("verification") || page.url().contains("identity") || !page.url().contains("/lightning/")) {
             // Check if it's actually an OTP page or just a splash page
             if (page.locator("input#emc, input[name='emc']").count() > 0) {
-                System.out.println("[BaseTest] OTP verification required.");
+                log("OTP verification required.");
                 String code = fetchOtpCode(loginTimestamp);
                 page.locator("input#emc, input[name='emc'], input[type='text']").first().fill(code);
                 Locator remember = page.locator("input#RememberDeviceCheckbox");
                 if (remember.count() > 0) remember.check();
+                saveDebugScreenshot("before_otp_submit");
                 page.locator("input#save, input[type='submit']").first().click();
                 try {
                     page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(30000));
@@ -114,38 +142,62 @@ public class BaseTest {
 
         handleIntermediatePages();
 
-        System.out.println("[BaseTest] Waiting for Lightning URL...");
-        page.waitForURL("**/lightning/**", new Page.WaitForURLOptions().setTimeout(90000));
-        System.out.println("[BaseTest] Login successful: " + page.url().split("\\?")[0]);
+        log("Waiting for Lightning URL...");
+        try {
+            page.waitForURL("**/lightning/**", new Page.WaitForURLOptions().setTimeout(90000));
+        } catch (Exception e) {
+            log("Timed out waiting for Lightning URL. Current URL: " + page.url());
+            saveDebugScreenshot("lightning_timeout");
+            throw e;
+        }
+        log("Login successful: " + page.url().split("\\?")[0]);
 
         // Cache the authenticated session
         try {
             context.storageState(new BrowserContext.StorageStateOptions()
                 .setPath(Paths.get(ConfigManager.getSessionFile())));
-            System.out.println("[BaseTest] Session cached to " + ConfigManager.getSessionFile());
+            log("Session cached to " + ConfigManager.getSessionFile());
         } catch (Exception e) {
-            System.out.println("[BaseTest] Warning: could not cache session: " + e.getMessage());
+            log("Warning: could not cache session: " + e.getMessage());
         }
     }
 
     /** Handles common Salesforce splash pages that block navigation to Lightning. */
     private void handleIntermediatePages() {
         String url = page.url();
-        System.out.println("[BaseTest] Checking for intermediate pages at: " + url);
+        log("Checking for intermediate pages at: " + url);
         
         // "Register Your Mobile Phone" / "Verify Your Identity" (with 'Not Now' option)
         Locator notNow = page.locator("a:has-text('Not Now'), a:has-text('Remind Me Later')");
         if (notNow.count() > 0 && notNow.first().isVisible()) {
-            System.out.println("[BaseTest] Clicking 'Not Now' / 'Remind Me Later'...");
+            log("Clicking 'Not Now' / 'Remind Me Later'...");
             notNow.first().click();
             try { page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(20000)); } catch (Exception ignored) {}
+            saveDebugScreenshot("after_not_now");
         }
 
         // Lightning Experience transition splash
         if (page.locator(".slds-button:has-text('Switch to Lightning Experience')").count() > 0) {
-            System.out.println("[BaseTest] Clicking 'Switch to Lightning Experience'...");
+            log("Clicking 'Switch to Lightning Experience'...");
             page.locator(".slds-button:has-text('Switch to Lightning Experience')").click();
             try { page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(20000)); } catch (Exception ignored) {}
+            saveDebugScreenshot("after_switch_to_lightning");
+        }
+    }
+
+    private void log(String message) {
+        String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
+        System.out.println("[BaseTest] [" + timestamp + "] " + message);
+    }
+
+    private void saveDebugScreenshot(String name) {
+        try {
+            new java.io.File("screenshots/debug").mkdirs();
+            String path = "screenshots/debug/" + name + "_" + System.currentTimeMillis() + ".png";
+            page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(path)));
+            log("Debug screenshot saved: " + path);
+        } catch (Exception e) {
+            log("Failed to save debug screenshot: " + e.getMessage());
         }
     }
 
@@ -171,7 +223,7 @@ public class BaseTest {
             "Verification Code[^0-9]+([0-9]{5,8})", Pattern.CASE_INSENSITIVE);
 
         long deadline = System.currentTimeMillis() + 90_000;
-        System.out.println("[BaseTest] Polling testmail.app for OTP code...");
+        log("Polling testmail.app for OTP code...");
         while (System.currentTimeMillis() < deadline) {
             try {
                 Thread.sleep(4000);
@@ -187,7 +239,7 @@ public class BaseTest {
                 String found = null;
                 while (m.find()) found = m.group(1);
                 if (found != null) {
-                    System.out.println("[BaseTest] OTP code found: " + found);
+                    log("OTP code found: " + found);
                     return found;
                 }
             } catch (InterruptedException e) {
