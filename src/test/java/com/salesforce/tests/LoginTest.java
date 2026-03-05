@@ -11,40 +11,7 @@ import org.testng.annotations.*;
 // with a fresh browser context (no saved session).
 @Epic("Authentication")
 @Feature("Login")
-public class LoginTest {
-
-    private Playwright playwright;
-    private Browser browser;
-    private BrowserContext context;
-    protected Page page;
-
-    @BeforeClass
-    public void setup() {
-        playwright = Playwright.create();
-        browser = playwright.chromium().launch(
-            new BrowserType.LaunchOptions()
-                .setHeadless(ConfigManager.isHeadless())
-        );
-    }
-
-    @BeforeMethod
-    public void openPage() {
-        context = browser.newContext();
-        context.setDefaultTimeout(30000);
-        page = context.newPage();
-    }
-
-    @AfterMethod
-    public void closePage() {
-        if (page != null)    page.close();
-        if (context != null) context.close();
-    }
-
-    @AfterClass
-    public void teardown() {
-        if (browser != null)    browser.close();
-        if (playwright != null) playwright.close();
-    }
+public class LoginTest extends BaseTest {
 
     @Test
     @Story("Login form elements")
@@ -83,16 +50,8 @@ public class LoginTest {
     @Description("Verify that valid credentials redirect the user to Salesforce Lightning (or MFA if enabled).")
     @Severity(SeverityLevel.BLOCKER)
     public void testLoginWithValidCredentials() {
-        LoginPage loginPage = new LoginPage(page);
-        loginPage.navigate(ConfigManager.getBaseUrl());
-        loginPage.login(ConfigManager.getUsername(), ConfigManager.getPassword());
-
-        // Salesforce briefly lands on the root URL before redirecting to Lightning.
-        // Wait for that redirect; if it times out, we may be on MFA/verification instead.
-        try {
-            page.waitForURL("**lightning**",
-                new Page.WaitForURLOptions().setTimeout(20000));
-        } catch (Exception ignored) {}
+        // BaseTest.@BeforeMethod already logs in using ConfigManager credentials.
+        // We just verify the state after that successful login.
         page.waitForLoadState(com.microsoft.playwright.options.LoadState.DOMCONTENTLOADED);
         String url = page.url();
 

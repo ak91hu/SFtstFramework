@@ -10,6 +10,10 @@ sf.password=your-password-here
 # Leave as session.json unless you change the script.
 sf.session.file=session.json
 
+# testmail.app API settings for MFA/OTP verification
+testmail.namespace=tssj8
+testmail.tag=test
+
 # Browser settings
 browser.headless=true
 browser.slowmo=0

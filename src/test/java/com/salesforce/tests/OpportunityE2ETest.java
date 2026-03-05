@@ -126,7 +126,8 @@ public class OpportunityE2ETest extends BaseTest {
             page.fill("input[name='Amount']", "100000"));
 
         retryAction("click Save", () ->
-            page.locator("xpath=//button[normalize-space()='Save']").click());
+            page.locator("button:visible").filter(
+                new com.microsoft.playwright.Locator.FilterOptions().setHasText("Save")).last().click());
 
         // Wait for the record detail page URL (/r/Opportunity/{id}/view)
         log("  Waiting for record detail page...");

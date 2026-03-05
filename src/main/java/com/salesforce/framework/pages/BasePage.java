@@ -25,35 +25,34 @@ public abstract class BasePage {
     }
 
     protected void clickSave() {
-        // XPath exact text match avoids matching "Save & New"
-        page.locator("xpath=//button[normalize-space()='Save']").click();
+        // Prefer visible button in the modal or at the end of the DOM to avoid background clicks.
+        Locator saveBtn = page.locator("button:visible").filter(
+            new Locator.FilterOptions().setHasText("Save")).last();
+        saveBtn.click();
         waitForSpinner();
-        // Handle "Similar Records Exist" duplicate warning (org uses "Warn" rule).
-        // "View Duplicates" is an <a> link, so detect the popup heading text instead.
+        
+        // Handle "Similar Records Exist" duplicate warning
         try {
             page.waitForSelector(":has-text('Similar Records Exist')",
                 new Page.WaitForSelectorOptions().setTimeout(3000));
-            page.locator("xpath=//button[normalize-space()='Save']").click();
+            saveBtn.click();
             waitForSpinner();
         } catch (Exception ignored) {}
     }
 
     protected void clickCancelForm() {
-        page.locator("button[name='CancelEdit']").click();
+        page.locator("button:visible[name='CancelEdit']").first().click();
     }
 
     // Select a picklist value by the field's label text and the desired option text.
     protected void selectPicklist(String fieldLabel, String optionValue) {
-        // Find the lightning-combobox (or fallback div) that contains the label text,
-        // open it by clicking its trigger button, then click the matching option.
-        page.locator("lightning-combobox, div.slds-form-element")
-            .filter(new Locator.FilterOptions().setHasText(fieldLabel))
-            .first()
-            .locator("button")
-            .first()
-            .click();
-        // :visible excludes hidden option elements from closed/cached dropdowns.
-        // This avoids picking up invisible option elements from previously opened dropdowns.
+        // Match a container (combobox or form-element) that contains a label with exact text match.
+        Locator container = page.locator("lightning-combobox, div.slds-form-element")
+            .filter(new Locator.FilterOptions().setHas(page.locator("label").filter(
+                new Locator.FilterOptions().setHasText(fieldLabel)))).first();
+        
+        container.locator("button").first().click();
+        
         page.waitForSelector("[role='option']:visible",
             new Page.WaitForSelectorOptions().setTimeout(5000));
         page.locator("[role='option']:visible")
@@ -71,7 +70,8 @@ public abstract class BasePage {
         try {
             page.waitForFunction(
                 "() => { const t = document.title; return t.includes(' | ') && " +
-                "!t.startsWith('Lightning') && !t.startsWith('New ') && !t.startsWith('Home'); }",
+                "!t.startsWith('Lightning') && !t.startsWith('New ') && " +
+                "!t.startsWith('Home') && !t.startsWith('Developer'); }",
                 null, new Page.WaitForFunctionOptions().setTimeout(15000));
         } catch (Exception ignored) {}
         String title = page.title();

@@ -112,8 +112,13 @@ public class BaseTest {
                 "TESTMAIL_API_KEY env var is required for Salesforce OTP verification. " +
                 "Set it locally or add it as a GitHub Secret.");
         }
+        String namespace = ConfigManager.getTestmailNamespace();
+        if (namespace.isEmpty()) namespace = "tssj8";
+        String tag = ConfigManager.getTestmailTag();
+        if (tag.isEmpty()) tag = "test";
+
         String apiUrl = "https://api.testmail.app/api/json"
-            + "?apikey=" + apiKey + "&namespace=tssj8&tag=test";
+            + "?apikey=" + apiKey + "&namespace=" + namespace + "&tag=" + tag;
         Pattern codePattern = Pattern.compile(
             "Verification Code[^0-9]+([0-9]{5,8})", Pattern.CASE_INSENSITIVE);
 
