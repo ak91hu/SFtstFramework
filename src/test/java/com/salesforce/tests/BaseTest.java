@@ -123,11 +123,29 @@ public class BaseTest {
         log("Post-login URL: " + page.url());
         saveDebugScreenshot("post_login_click");
 
-        // Handle email OTP verification (Salesforce sends a code when device is unrecognised).
+        // Handle email OTP verification
         if (page.url().contains("verification") || page.url().contains("identity") || !page.url().contains("/lightning/")) {
-            // Check if it's actually an OTP page or just a splash page
+            // Case 1: On Start page (need to click "Send" button)
+            if (page.url().contains("EmailVerificationStartUi")) {
+                log("On verification START page. Looking for Send button...");
+                saveDebugScreenshot("verification_start");
+                Locator sendBtn = page.locator("input#save, input#verify, input[type='submit'], button:has-text('Send')");
+                if (sendBtn.count() > 0) {
+                    sendBtn.first().click();
+                    log("Clicked Send button. Waiting for Finish page...");
+                    try {
+                        page.waitForURL(url -> url.contains("EmailVerificationFinishUi"), 
+                            new Page.WaitForURLOptions().setTimeout(20000));
+                        page.waitForLoadState(LoadState.DOMCONTENTLOADED);
+                    } catch (Exception e) {
+                        log("URL did not change to FinishUi after clicking Send. Current: " + page.url());
+                    }
+                }
+            }
+
+            // Case 2: On Finish page (need to enter code)
             if (page.locator("input#emc, input[name='emc']").count() > 0) {
-                log("OTP verification required.");
+                log("On verification FINISH page. OTP required.");
                 String code = fetchOtpCode(loginTimestamp);
                 page.locator("input#emc, input[name='emc'], input[type='text']").first().fill(code);
                 Locator remember = page.locator("input#RememberDeviceCheckbox");
