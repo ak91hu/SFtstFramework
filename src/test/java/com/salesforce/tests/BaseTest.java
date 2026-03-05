@@ -124,30 +124,33 @@ public class BaseTest {
         log("Post-login URL: " + page.url());
         saveDebugScreenshot("post_login_click");
 
-        // Handle email OTP verification
+        // Handle email OTP verification (MFA / Computer Activation)
         if (page.url().contains("verification") || page.url().contains("identity") || !page.url().contains("/lightning/")) {
-            // Case 1: On Start page (need to click "Send" button)
-            if (page.url().contains("EmailVerificationStartUi")) {
-                log("On verification START page. Looking for Send button...");
+            // Case 1: On Start page (need to click "Send" or "Continue" button)
+            if (page.url().contains("StartUi")) {
+                log("On identity/verification START page. Looking for Send/Continue button...");
                 saveDebugScreenshot("verification_start");
                 
-                // Broad selector: Salesforce often uses input[name='save'] or value containing "Email"
+                // Broad selector: Salesforce often uses input[name='save'] or value containing "Email", "Send", or "Continue"
                 Locator sendBtn = page.locator("input#save, input#verify, input[name='save'], input[type='submit'], " +
-                                              "button:has-text('Send'), input[value*='Email']").first();
+                                              "button:has-text('Send'), button:has-text('Continue'), " +
+                                              "input[value*='Email'], input[value*='Send'], input[value*='Continue']").first();
                 try {
                     sendBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
-                    log("Send button found: " + sendBtn.getAttribute("value"));
+                    String btnLabel = sendBtn.getAttribute("value");
+                    if (btnLabel == null) btnLabel = sendBtn.innerText();
+                    log("Action button found: " + btnLabel);
                     sendBtn.click();
-                    log("Clicked Send button. Waiting for Finish page...");
+                    log("Clicked action button. Waiting for Finish page...");
                     try {
-                        page.waitForURL(url -> url.contains("EmailVerificationFinishUi"), 
+                        page.waitForURL(url -> url.contains("FinishUi") || url.contains("verification") || url.contains("/lightning/"), 
                             new Page.WaitForURLOptions().setTimeout(25000));
                         page.waitForLoadState(LoadState.DOMCONTENTLOADED);
                     } catch (Exception e) {
                         log("URL did not change to FinishUi after clicking Send. Current: " + page.url());
                     }
                 } catch (Exception e) {
-                    log("Send button not visible after 10s. Listing all visible buttons...");
+                    log("Send/Continue button not visible after 10s. Listing all visible buttons...");
                     Locator allButtons = page.locator("input[type='submit'], button:visible");
                     for (int i = 0; i < allButtons.count(); i++) {
                         log("  Button " + i + ": " + allButtons.nth(i).getAttribute("value") + " | " + allButtons.nth(i).innerText());
@@ -156,16 +159,16 @@ public class BaseTest {
             }
 
             // Case 2: On Finish page (need to enter code)
-            if (page.locator("input#emc, input[name='emc']").count() > 0) {
+            if (page.locator("input#emc, input[name='emc'], input#otp").count() > 0) {
                 log("On verification FINISH page. OTP required.");
                 String code = fetchOtpCode(loginTimestamp);
-                page.locator("input#emc, input[name='emc'], input[type='text']").first().fill(code);
+                page.locator("input#emc, input[name='emc'], input#otp, input[type='text']").first().fill(code);
                 Locator remember = page.locator("input#RememberDeviceCheckbox");
                 if (remember.count() > 0) remember.check();
                 saveDebugScreenshot("before_otp_submit");
                 
                 String postOtpUrl = page.url();
-                page.locator("input#save, input#verify, input[type='submit']").first().click();
+                page.locator("input#save, input#verify, input[type='submit'], button:has-text('Verify')").first().click();
                 
                 log("Waiting for post-OTP redirect...");
                 try {
