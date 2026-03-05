@@ -29,9 +29,19 @@ public class ConfigManager {
 
     public static String get(String key) {
         String base = key.toUpperCase().replace('.', '_');
-        String envKey = base.startsWith("SF_") ? base : "SF_" + base;
-        String envVal = System.getenv(envKey);
-        if (envVal != null && !envVal.isEmpty()) return envVal;
+        
+        // Try multiple conventions to find the env var
+        String[] candidates = {
+            "SF_" + base,       // SF_BASE_URL or SF_SF_BASE_URL (if key was sf.sf.base.url)
+            "SF_SF_" + base,    // SF_SF_BASE_URL (for user's specific secrets)
+            base                // SF_BASE_URL or BROWSER_HEADLESS
+        };
+        
+        for (String candidate : candidates) {
+            String val = System.getenv(candidate);
+            if (val != null && !val.isEmpty()) return val;
+        }
+        
         return props.getProperty(key, "");
     }
 

@@ -35,9 +35,9 @@ jobs:
 
       - name: Write config.properties
         env:
-          SF_BASE_URL: ${{ secrets.SF_BASE_URL }}
-          SF_USERNAME: ${{ secrets.SF_USERNAME }}
-          SF_PASSWORD: ${{ secrets.SF_PASSWORD }}
+          SF_BASE_URL: ${{ secrets.SF_SF_BASE_URL }}
+          SF_USERNAME: ${{ secrets.SF_SF_USERNAME }}
+          SF_PASSWORD: ${{ secrets.SF_SF_PASSWORD }}
         run: |
           cat > src/test/resources/config.properties << EOF
           sf.base.url=${SF_BASE_URL}
@@ -57,9 +57,10 @@ jobs:
         # the Allure report is generated even when tests fail.
         env:
           TESTMAIL_API_KEY: ${{ secrets.TESTMAIL_API_KEY }}
-          SF_BASE_URL: ${{ secrets.SF_BASE_URL }}
-          SF_USERNAME: ${{ secrets.SF_USERNAME }}
-          SF_PASSWORD: ${{ secrets.SF_PASSWORD }}
+          SF_BASE_URL: ${{ secrets.SF_SF_BASE_URL }}
+          SF_USERNAME: ${{ secrets.SF_SF_USERNAME }}
+          SF_PASSWORD: ${{ secrets.SF_SF_PASSWORD }}
+          SF_BROWSER_HEADLESS: ${{ secrets.SF_BROWSER_HEADLESS }}
         run: mvn verify --no-transfer-progress
 
       - name: Fail pipeline if tests failed
