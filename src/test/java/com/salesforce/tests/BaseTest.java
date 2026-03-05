@@ -59,45 +59,93 @@ public class BaseTest {
     }
 
     private void ensureLoggedIn() {
-        page.navigate(ConfigManager.getBaseUrl() + "/lightning/page/home",
-            new Page.NavigateOptions().setTimeout(60000));
-        page.waitForLoadState(LoadState.DOMCONTENTLOADED);
+        String targetUrl = ConfigManager.getBaseUrl();
+        if (targetUrl.endsWith("/")) targetUrl = targetUrl.substring(0, targetUrl.length() - 1);
+        targetUrl += "/lightning/page/home";
+
+        System.out.println("[BaseTest] Navigating to: " + targetUrl);
+        page.navigate(targetUrl, new Page.NavigateOptions().setTimeout(90000));
+        
+        try {
+            page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(15000));
+        } catch (Exception ignored) {}
+
+        System.out.println("[BaseTest] Current URL: " + page.url());
 
         // If we ended up on the login page, the session is missing or expired.
         if (page.url().contains("/login") || page.locator("#username").isVisible()) {
+            System.out.println("[BaseTest] Session expired or not found. Logging in...");
             doLogin();
+        } else {
+            System.out.println("[BaseTest] Already logged in or on an intermediate page.");
+            handleIntermediatePages();
         }
     }
 
     private void doLogin() {
         long loginTimestamp = System.currentTimeMillis();
+        System.out.println("[BaseTest] Filling credentials for: " + ConfigManager.getUsername());
+        
         page.fill("#username", ConfigManager.getUsername());
         page.fill("#password", ConfigManager.getPassword());
         page.click("#Login");
-        page.waitForLoadState(LoadState.DOMCONTENTLOADED);
-        try { Thread.sleep(2000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        
+        try {
+            page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(30000));
+        } catch (Exception ignored) {}
+        
+        System.out.println("[BaseTest] Post-login URL: " + page.url());
 
         // Handle email OTP verification (Salesforce sends a code when device is unrecognised).
-        if (!page.url().contains("/lightning/")) {
-            System.out.println("[BaseTest] OTP verification required.");
-            String code = fetchOtpCode(loginTimestamp);
-            page.locator("input#emc, input[name='emc'], input[type='text']").first().fill(code);
-            Locator remember = page.locator("input#RememberDeviceCheckbox");
-            if (remember.count() > 0) remember.check();
-            page.locator("input#save, input[type='submit']").first().click();
-            page.waitForLoadState(LoadState.DOMCONTENTLOADED);
+        if (page.url().contains("verification") || page.url().contains("identity") || !page.url().contains("/lightning/")) {
+            // Check if it's actually an OTP page or just a splash page
+            if (page.locator("input#emc, input[name='emc']").count() > 0) {
+                System.out.println("[BaseTest] OTP verification required.");
+                String code = fetchOtpCode(loginTimestamp);
+                page.locator("input#emc, input[name='emc'], input[type='text']").first().fill(code);
+                Locator remember = page.locator("input#RememberDeviceCheckbox");
+                if (remember.count() > 0) remember.check();
+                page.locator("input#save, input[type='submit']").first().click();
+                try {
+                    page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(30000));
+                } catch (Exception ignored) {}
+            }
         }
 
-        page.waitForURL("**/lightning/**", new Page.WaitForURLOptions().setTimeout(60000));
+        handleIntermediatePages();
+
+        System.out.println("[BaseTest] Waiting for Lightning URL...");
+        page.waitForURL("**/lightning/**", new Page.WaitForURLOptions().setTimeout(90000));
         System.out.println("[BaseTest] Login successful: " + page.url().split("\\?")[0]);
 
-        // Cache the authenticated session so subsequent tests in this run skip re-login.
+        // Cache the authenticated session
         try {
             context.storageState(new BrowserContext.StorageStateOptions()
                 .setPath(Paths.get(ConfigManager.getSessionFile())));
             System.out.println("[BaseTest] Session cached to " + ConfigManager.getSessionFile());
         } catch (Exception e) {
             System.out.println("[BaseTest] Warning: could not cache session: " + e.getMessage());
+        }
+    }
+
+    /** Handles common Salesforce splash pages that block navigation to Lightning. */
+    private void handleIntermediatePages() {
+        String url = page.url();
+        System.out.println("[BaseTest] Checking for intermediate pages at: " + url);
+        
+        // "Register Your Mobile Phone" / "Verify Your Identity" (with 'Not Now' option)
+        Locator notNow = page.locator("a:has-text('Not Now'), a:has-text('Remind Me Later')");
+        if (notNow.count() > 0 && notNow.first().isVisible()) {
+            System.out.println("[BaseTest] Clicking 'Not Now' / 'Remind Me Later'...");
+            notNow.first().click();
+            try { page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(20000)); } catch (Exception ignored) {}
+        }
+
+        // Lightning Experience transition splash
+        if (page.locator(".slds-button:has-text('Switch to Lightning Experience')").count() > 0) {
+            System.out.println("[BaseTest] Clicking 'Switch to Lightning Experience'...");
+            page.locator(".slds-button:has-text('Switch to Lightning Experience')").click();
+            try { page.waitForLoadState(LoadState.DOMCONTENTLOADED, new Page.WaitForLoadStateOptions().setTimeout(20000)); } catch (Exception ignored) {}
         }
     }
 
